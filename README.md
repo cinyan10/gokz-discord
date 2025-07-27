@@ -3,7 +3,7 @@
 ![Downloads](https://img.shields.io/github/downloads/zer0k-z/gokz-discord/total?style=flat-square) ![Last commit](https://img.shields.io/github/last-commit/zer0k-z/gokz-discord?style=flat-square) ![Open issues](https://img.shields.io/github/issues/zer0k-z/gokz-discord?style=flat-square) ![Closed issues](https://img.shields.io/github/issues-closed/zer0k-z/gokz-discord?style=flat-square) ![Size](https://img.shields.io/github/repo-size/zer0k-z/gokz-discord?style=flat-square) ![GitHub Workflow Status](https://img.shields.io/github/workflow/status/zer0k-z/gokz-discord/Compile%20with%20SourceMod?style=flat-square)
 
 
-An optional module for GOKZ that posts server records to a Discord channel using webhooks. 
+An optional module for GOKZ that sends server records to a reporting endpoint.
 
 [**Examples**](https://i.imgur.com/CbTlTfd.png).
 
@@ -11,13 +11,11 @@ An optional module for GOKZ that posts server records to a Discord channel using
  * Make sure your server is up to date.
  * Install GOKZ and all the dependencies if you didn't do it yet.
  * Download and extract the latest version of from the ``Release`` tab to ``csgo``
- * Get your webhook URL from your Discord server and replace ``insert webhook here`` with yours in ``csgo/addons/sourcemod/configs/gokz-discord.cfg``.
+* Configure ``gokz_report_token`` in ``csgo/cfg/sourcemod/gokz/gokz-discord.cfg`` with your authentication token.
 
-### Create a Webhook URL ###
+### Configure Report Endpoint ###
 
-As a server administrator, go on ``Server Settings``  then ``Integrations`` then ``Webhooks``. Click on ``New Webhook``, choose the name of your webhook and its channel, then click on ``Copy Webhook URL`` to obtain the link. 
-
-Changing the webhook's name or channel will **not** alter the link.
+Ensure a service is listening on ``http://127.0.0.1:8080/report`` to handle JSON reports with the fields ``token``, ``title`` and ``content``.
 
 ### Requirements ###
  * Sourcemod and Metamod

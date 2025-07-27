@@ -84,11 +84,13 @@ static void CreateConVars()
 	gCV_ShowVelChangeSync = AutoExecConfig_CreateConVar("gokz_discord_show_sync_velchange", "1", "Show air velocity change statistics in the announcement (more-stats)", _, true, 0.0, true, 1.0);
 	gCV_ShowOverlap = AutoExecConfig_CreateConVar("gokz_discord_show_overlap", "1", "Show overlap airstrafe statistics in the announcement (more-stats)", _, true, 0.0, true, 1.0);
 	gCV_ShowDeadAir = AutoExecConfig_CreateConVar("gokz_discord_show_deadair", "1", "Show dead airstrafe statistics in the announcement (more-stats)", _, true, 0.0, true, 1.0);
-	gCV_ShowBadAngles = AutoExecConfig_CreateConVar("gokz_discord_show_badangles", "1", "Show bad angles airstrafe statistics in the announcement (more-stats)", _, true, 0.0, true, 1.0);
-	gCV_ShowScrollStats = AutoExecConfig_CreateConVar("gokz_discord_show_scrollstats", "1", "Show scroll statistics in the announcement (more-stats)", _, true, 0.0, true, 1.0);
+        gCV_ShowBadAngles = AutoExecConfig_CreateConVar("gokz_discord_show_badangles", "1", "Show bad angles airstrafe statistics in the announcement (more-stats)", _, true, 0.0, true, 1.0);
+        gCV_ShowScrollStats = AutoExecConfig_CreateConVar("gokz_discord_show_scrollstats", "1", "Show scroll statistics in the announcement (more-stats)", _, true, 0.0, true, 1.0);
 
-	AutoExecConfig_ExecuteFile();
-	AutoExecConfig_CleanFile();	
+        gCV_ReportToken = AutoExecConfig_CreateConVar("gokz_report_token", "", "Authentication token for the report endpoint");
+
+        AutoExecConfig_ExecuteFile();
+        AutoExecConfig_CleanFile();
 }
 
 public void OnAllPluginsLoaded()
@@ -208,23 +210,26 @@ public Action Timer_CheckRecord(Handle timer)
 
 void DiscordAnnounceRecord(Record record)
 {
-	int recordType = record.GetRecordType(gCV_MinRankLocal.IntValue, gCV_MinRankGlobal.IntValue);
-	if (recordType == RecordType_Default || recordType < gCV_MinRecordType.IntValue)
-	{
-		return;
-	}
-	char webHookURL[2048];
-	GetWebHook(record, webHookURL, sizeof(webHookURL));
-	DiscordWebHook webHook = new DiscordWebHook(webHookURL);
-	webHook.Embed(CreateEmbed(record));
-	webHook.SetContent(AnnounceContent(record));
-	webHook.Send();
-	webHook.Dispose();
+        int recordType = record.GetRecordType(gCV_MinRankLocal.IntValue, gCV_MinRankGlobal.IntValue);
+        if (recordType == RecordType_Default || recordType < gCV_MinRecordType.IntValue)
+        {
+                return;
+        }
+        char token[256];
+        gCV_ReportToken.GetString(token, sizeof(token));
+
+        char title[64];
+        Format(title, sizeof(title), "%T", gC_RecordType_Names[recordType], LANG_SERVER);
+
+        char content[MAX_FIELD_VALUE_LENGTH];
+        strcopy(content, sizeof(content), AnnounceContent(record));
+
+        SendReport(token, title, content);
 }
 
 static char[] AnnounceContent(Record record)
 {
-	char value[MAX_FIELD_VALUE_LENGTH];
+        char value[MAX_FIELD_VALUE_LENGTH];
 	gKV_DiscordConfig.Rewind();
 	if (!gKV_DiscordConfig.JumpToKey("Content"))
 	{
@@ -237,7 +242,30 @@ static char[] AnnounceContent(Record record)
 		return value;
 	}
 
-	gKV_DiscordConfig.GetString("Content", value, sizeof(value));
-	DiscordReplaceString(record, value, sizeof(value));	
-	return value;
+        gKV_DiscordConfig.GetString("Content", value, sizeof(value));
+        DiscordReplaceString(record, value, sizeof(value));
+        return value;
+}
+
+static void SendReport(const char[] token, const char[] title, const char[] content)
+{
+        Handle request = SteamWorks_CreateHTTPRequest(HTTPMethod_Post, "http://127.0.0.1:8080/report");
+        if (request == INVALID_HANDLE)
+        {
+                return;
+        }
+
+        SteamWorks_SetHTTPRequestHeaderValue(request, "Content-Type", "application/json");
+
+        char body[512];
+        FormatEx(body, sizeof(body), "{\"token\":\"%s\",\"title\":\"%s\",\"content\":\"%s\"}", token, title, content);
+        SteamWorks_SetHTTPRequestRawPostBody(request, "application/json", body, strlen(body));
+
+        SteamWorks_SendHTTPRequest(request, OnReportSent, 0);
+}
+
+public int OnReportSent(Handle request, bool failure, bool requestSuccessful, EHTTPStatusCode statusCode, any data)
+{
+        SteamWorks_DestroyHTTPRequest(request);
+        return 0;
 }

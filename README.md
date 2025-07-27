@@ -12,6 +12,7 @@ An optional module for GOKZ that sends server records to a reporting endpoint.
  * Install GOKZ and all the dependencies if you didn't do it yet.
  * Download and extract the latest version of from the ``Release`` tab to ``csgo``
 * Configure ``gokz_report_token`` in ``csgo/cfg/sourcemod/gokz/gokz-discord.cfg`` with your authentication token.
+
 * Set ``gokz_report_url`` to your report endpoint and ``gokz_qq_group_number`` to specify where reports are sent.
 
 ### Configure Report Endpoint ###

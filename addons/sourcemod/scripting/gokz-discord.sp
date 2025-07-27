@@ -77,15 +77,16 @@ static void CreateConVars()
 	gCV_ShowVelChangeSync = AutoExecConfig_CreateConVar("gokz_discord_show_sync_velchange", "1", "Show air velocity change statistics in the announcement (more-stats)", _, true, 0.0, true, 1.0);
 	gCV_ShowOverlap = AutoExecConfig_CreateConVar("gokz_discord_show_overlap", "1", "Show overlap airstrafe statistics in the announcement (more-stats)", _, true, 0.0, true, 1.0);
 	gCV_ShowDeadAir = AutoExecConfig_CreateConVar("gokz_discord_show_deadair", "1", "Show dead airstrafe statistics in the announcement (more-stats)", _, true, 0.0, true, 1.0);
-        gCV_ShowBadAngles = AutoExecConfig_CreateConVar("gokz_discord_show_badangles", "1", "Show bad angles airstrafe statistics in the announcement (more-stats)", _, true, 0.0, true, 1.0);
-        gCV_ShowScrollStats = AutoExecConfig_CreateConVar("gokz_discord_show_scrollstats", "1", "Show scroll statistics in the announcement (more-stats)", _, true, 0.0, true, 1.0);
+  gCV_ShowBadAngles = AutoExecConfig_CreateConVar("gokz_discord_show_badangles", "1", "Show bad angles airstrafe statistics in the announcement (more-stats)", _, true, 0.0, true, 1.0);
+  gCV_ShowScrollStats = AutoExecConfig_CreateConVar("gokz_discord_show_scrollstats", "1", "Show scroll statistics in the announcement (more-stats)", _, true, 0.0, true, 1.0);
 
-       gCV_ReportToken = AutoExecConfig_CreateConVar("gokz_report_token", "", "Authentication token for the report endpoint");
-       gCV_ReportURL = AutoExecConfig_CreateConVar("gokz_report_url", "http://127.0.0.1:8080/report", "URL of the HTTP report endpoint");
-       gCV_QQGroupNumber = AutoExecConfig_CreateConVar("gokz_qq_group_number", "", "QQ group number for reporting");
+  gCV_ReportToken = AutoExecConfig_CreateConVar("gokz_report_token", "", "Authentication token for the report endpoint");
+  gCV_ReportURL = AutoExecConfig_CreateConVar("gokz_report_url", "http://127.0.0.1:8080/report", "URL of the HTTP report endpoint");
+  gCV_QQGroupNumber = AutoExecConfig_CreateConVar("gokz_qq_group_number", "", "QQ group number for reporting");
 
-        AutoExecConfig_ExecuteFile();
-        AutoExecConfig_CleanFile();
+
+  AutoExecConfig_ExecuteFile();
+  AutoExecConfig_CleanFile();
 }
 
 public void OnAllPluginsLoaded()
@@ -236,24 +237,22 @@ static char[] AnnounceContent(Record record)
 
 static void SendReport(const char[] token, const char[] title, const char[] content)
 {
-       char url[256];
-       gCV_ReportURL.GetString(url, sizeof(url));
-       Handle request = SteamWorks_CreateHTTPRequest(HTTPMethod_Post, url);
-       if (request == INVALID_HANDLE)
-       {
-               return;
-       }
+     char url[256];
+     gCV_ReportURL.GetString(url, sizeof(url));
+     Handle request = SteamWorks_CreateHTTPRequest(HTTPMethod_Post, url);
+     if (request == INVALID_HANDLE)
+     {
+             return;
+     }
 
-        SteamWorks_SetHTTPRequestHeaderValue(request, "Content-Type", "application/json");
+      SteamWorks_SetHTTPRequestHeaderValue(request, "Content-Type", "application/json");
 
-       char group[64];
-       gCV_QQGroupNumber.GetString(group, sizeof(group));
+     char group[64];
+     gCV_QQGroupNumber.GetString(group, sizeof(group));
 
-       char body[512];
-       FormatEx(body, sizeof(body), "{\"token\":\"%s\",\"title\":\"%s\",\"content\":\"%s\",\"send_to\":\"%s\"}", token, title, content, group);
-       SteamWorks_SetHTTPRequestRawPostBody(request, "application/json", body, strlen(body));
-
-        SteamWorks_SendHTTPRequest(request, OnReportSent, 0);
+     char body[512];
+     FormatEx(body, sizeof(body), "{\"token\":\"%s\",\"title\":\"%s\",\"content\":\"%s\",\"send_to\":\"%s\"}", token, title, content, group);
+     SteamWorks_SetHTTPRequestRawPostBody(request, "application/json", body, strlen(body));
 }
 
 public int OnReportSent(Handle request, bool failure, bool requestSuccessful, EHTTPStatusCode statusCode, any data)

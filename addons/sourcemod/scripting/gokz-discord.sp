@@ -14,7 +14,6 @@
 #include <gokz/localranks>
 #include <gokz/global>
 #include <more-stats>
-#include <updater>
 
 #define REQUIRE_EXTENSIONS
 #define REQUIRE_PLUGIN
@@ -22,7 +21,6 @@
 #include "gokz-discord/globals.sp"
 #include "gokz-discord/helpers.sp"
 #include "gokz-discord/gokz-forwards.sp"
-#include "gokz-discord/embeds.sp"
 
 #pragma newdecls required
 #pragma semicolon 1
@@ -36,7 +34,6 @@ public Plugin myinfo =
 	url = "https://github.com/zer0k-z/gokz-discord"
 };
 
-#define UPDATER_URL "https://raw.githubusercontent.com/zer0k-z/gokz-discord/updater/updatefile.txt"
 
 public void OnPluginStart()
 {
@@ -48,10 +45,6 @@ public void OnPluginStart()
 	InitAnnounceTimer();
 	RegConsoleCmd("sm_testdiscord", DiscordInit);
 
-	if (LibraryExists("updater"))
-	{
-		Updater_AddPlugin(UPDATER_URL);
-	}
 }
 
 static void CreateConVars()
@@ -84,11 +77,15 @@ static void CreateConVars()
 	gCV_ShowVelChangeSync = AutoExecConfig_CreateConVar("gokz_discord_show_sync_velchange", "1", "Show air velocity change statistics in the announcement (more-stats)", _, true, 0.0, true, 1.0);
 	gCV_ShowOverlap = AutoExecConfig_CreateConVar("gokz_discord_show_overlap", "1", "Show overlap airstrafe statistics in the announcement (more-stats)", _, true, 0.0, true, 1.0);
 	gCV_ShowDeadAir = AutoExecConfig_CreateConVar("gokz_discord_show_deadair", "1", "Show dead airstrafe statistics in the announcement (more-stats)", _, true, 0.0, true, 1.0);
-	gCV_ShowBadAngles = AutoExecConfig_CreateConVar("gokz_discord_show_badangles", "1", "Show bad angles airstrafe statistics in the announcement (more-stats)", _, true, 0.0, true, 1.0);
-	gCV_ShowScrollStats = AutoExecConfig_CreateConVar("gokz_discord_show_scrollstats", "1", "Show scroll statistics in the announcement (more-stats)", _, true, 0.0, true, 1.0);
+        gCV_ShowBadAngles = AutoExecConfig_CreateConVar("gokz_discord_show_badangles", "1", "Show bad angles airstrafe statistics in the announcement (more-stats)", _, true, 0.0, true, 1.0);
+        gCV_ShowScrollStats = AutoExecConfig_CreateConVar("gokz_discord_show_scrollstats", "1", "Show scroll statistics in the announcement (more-stats)", _, true, 0.0, true, 1.0);
 
-	AutoExecConfig_ExecuteFile();
-	AutoExecConfig_CleanFile();	
+       gCV_ReportToken = AutoExecConfig_CreateConVar("gokz_report_token", "", "Authentication token for the report endpoint");
+       gCV_ReportURL = AutoExecConfig_CreateConVar("gokz_report_url", "http://127.0.0.1:8080/report", "URL of the HTTP report endpoint");
+       gCV_QQGroupNumber = AutoExecConfig_CreateConVar("gokz_qq_group_number", "", "QQ group number for reporting");
+
+        AutoExecConfig_ExecuteFile();
+        AutoExecConfig_CleanFile();
 }
 
 public void OnAllPluginsLoaded()
@@ -98,10 +95,6 @@ public void OnAllPluginsLoaded()
 		SetFailState("[GOKZ-Discord] Missing required plugin: gokz-core");
 	}
 
-	if (LibraryExists("updater"))
-	{
-		Updater_AddPlugin(UPDATER_URL);
-	}
 
 	if (LibraryExists("gokz-global"))
 	{
@@ -119,10 +112,6 @@ public void OnAllPluginsLoaded()
 
 public void OnLibraryAdded(const char[] name)
 {
-	if (StrEqual(name, "updater"))
-	{
-		Updater_AddPlugin(UPDATER_URL);
-	}
 	if (StrEqual(name, "gokz-global"))
 	{
 		gB_GOKZGlobal = true;
@@ -208,23 +197,26 @@ public Action Timer_CheckRecord(Handle timer)
 
 void DiscordAnnounceRecord(Record record)
 {
-	int recordType = record.GetRecordType(gCV_MinRankLocal.IntValue, gCV_MinRankGlobal.IntValue);
-	if (recordType == RecordType_Default || recordType < gCV_MinRecordType.IntValue)
-	{
-		return;
-	}
-	char webHookURL[2048];
-	GetWebHook(record, webHookURL, sizeof(webHookURL));
-	DiscordWebHook webHook = new DiscordWebHook(webHookURL);
-	webHook.Embed(CreateEmbed(record));
-	webHook.SetContent(AnnounceContent(record));
-	webHook.Send();
-	webHook.Dispose();
+        int recordType = record.GetRecordType(gCV_MinRankLocal.IntValue, gCV_MinRankGlobal.IntValue);
+        if (recordType == RecordType_Default || recordType < gCV_MinRecordType.IntValue)
+        {
+                return;
+        }
+        char token[256];
+        gCV_ReportToken.GetString(token, sizeof(token));
+
+        char title[64];
+        Format(title, sizeof(title), "%T", gC_RecordType_Names[recordType], LANG_SERVER);
+
+        char content[MAX_FIELD_VALUE_LENGTH];
+        strcopy(content, sizeof(content), AnnounceContent(record));
+
+        SendReport(token, title, content);
 }
 
 static char[] AnnounceContent(Record record)
 {
-	char value[MAX_FIELD_VALUE_LENGTH];
+        char value[MAX_FIELD_VALUE_LENGTH];
 	gKV_DiscordConfig.Rewind();
 	if (!gKV_DiscordConfig.JumpToKey("Content"))
 	{
@@ -237,7 +229,35 @@ static char[] AnnounceContent(Record record)
 		return value;
 	}
 
-	gKV_DiscordConfig.GetString("Content", value, sizeof(value));
-	DiscordReplaceString(record, value, sizeof(value));	
-	return value;
+        gKV_DiscordConfig.GetString("Content", value, sizeof(value));
+        DiscordReplaceString(record, value, sizeof(value));
+        return value;
+}
+
+static void SendReport(const char[] token, const char[] title, const char[] content)
+{
+       char url[256];
+       gCV_ReportURL.GetString(url, sizeof(url));
+       Handle request = SteamWorks_CreateHTTPRequest(HTTPMethod_Post, url);
+       if (request == INVALID_HANDLE)
+       {
+               return;
+       }
+
+        SteamWorks_SetHTTPRequestHeaderValue(request, "Content-Type", "application/json");
+
+       char group[64];
+       gCV_QQGroupNumber.GetString(group, sizeof(group));
+
+       char body[512];
+       FormatEx(body, sizeof(body), "{\"token\":\"%s\",\"title\":\"%s\",\"content\":\"%s\",\"send_to\":\"%s\"}", token, title, content, group);
+       SteamWorks_SetHTTPRequestRawPostBody(request, "application/json", body, strlen(body));
+
+        SteamWorks_SendHTTPRequest(request, OnReportSent, 0);
+}
+
+public int OnReportSent(Handle request, bool failure, bool requestSuccessful, EHTTPStatusCode statusCode, any data)
+{
+        SteamWorks_DestroyHTTPRequest(request);
+        return 0;
 }

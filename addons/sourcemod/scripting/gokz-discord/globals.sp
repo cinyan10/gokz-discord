@@ -33,3 +33,5 @@ ConVar gCV_ShowBadAngles;
 ConVar gCV_ShowScrollStats;
 
 ConVar gCV_ReportToken;
+ConVar gCV_ReportURL;
+ConVar gCV_QQGroupNumber;
